@@ -7,7 +7,7 @@
 ;; Description: Use 8comic to read manga.
 ;; Keyword: comic manga read reader
 ;; Version: 0.0.1
-;; Package-Requires: ((emacs "24.3"))
+;; Package-Requires: ((emacs "24.3") (request "0.3.0"))
 ;; URL: https://github.com/jcs-elpa/8comic
 
 ;; This file is NOT part of GNU Emacs.
@@ -32,11 +32,25 @@
 
 ;;; Code:
 
+(require 'request)
+
 (defgroup 8comic nil
   "Use 8comic to read manga."
   :prefix "8comic-"
   :group 'tool
   :link '(url-link :tag "Repository" "https://github.com/jcs-elpa/8comic"))
+
+(defun 8comic--insert-image-by-url (url)
+  "Insert image by URL."
+  (unless url (user-error "[WARNING] Couldn't find URL"))
+  (let ((buffer (url-retrieve-synchronously url)))
+    (unwind-protect
+        (let ((data (with-current-buffer buffer
+                      (goto-char (point-min))
+                      (search-forward "\n\n")
+                      (buffer-substring (point) (point-max)))))
+          (insert-image (create-image data nil t)))
+      (kill-buffer buffer))))
 
 
 (provide '8comic)
