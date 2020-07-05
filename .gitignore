@@ -1,0 +1,9 @@
+# ignore these directories.
+/.git
+/recipes
+/test
+8comic-pkg.el
+8comic-autoloads.el
+
+# ignore generated files.
+*.elc
