@@ -40,6 +40,15 @@
   :group 'tool
   :link '(url-link :tag "Repository" "https://github.com/jcs-elpa/8comic"))
 
+(defconst 8comic--url-html-format "https://comicbus.com/html/%s.html"
+  "URL 8comic front page format.")
+
+(defconst 8comic--url-view-1-format "https://comicbus.com/view/%s.html?ch=%s"
+  "URL 8comic view format for first page.")
+
+(defconst 8comic--url-view-a-format "https://comicbus.com/view/%s.html?ch=%s-%s"
+  "URL 8comic view format after first page.")
+
 (defun 8comic--insert-image-by-url (url)
   "Insert image by URL."
   (unless url (user-error "[WARNING] Couldn't find URL"))
@@ -52,6 +61,23 @@
           (insert-image (create-image data nil t)))
       (kill-buffer buffer))))
 
+(defun 8comic--test ()
+  "Test interactive."
+  (interactive)
+  (request
+    "https://comicbus.com/html/11011.html"
+    :type "GET"
+    :parser 'buffer-string
+    :success
+    (cl-function
+     (lambda (&key data &allow-other-keys)
+       (message "data: %s" data)
+       ))
+    :error
+    (cl-function
+     (lambda (&rest args &key _error-thrown &allow-other-keys)
+       (message "args: %s" args)
+       ))))
 
 (provide '8comic)
 ;;; 8comic.el ends here
