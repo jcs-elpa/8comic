@@ -32,6 +32,11 @@
 
 ;;; Code:
 
+(defgroup 8comic nil
+  "Use 8comic to read manga."
+  :prefix "8comic-"
+  :group 'tool
+  :link '(url-link :tag "Repository" "https://github.com/jcs-elpa/8comic"))
 
 
 (provide '8comic)
