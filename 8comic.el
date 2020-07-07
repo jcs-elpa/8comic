@@ -221,7 +221,7 @@ If RESET is non-nil, will force to make a new hash table."
   "Get all the entries for table."
   (let ((entries '()))
     (dolist (item 8comic--menu-dic)
-
+      ;; TODO: ..
       )
     entries))
 
