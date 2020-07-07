@@ -106,8 +106,8 @@
 
 (defun 8comic--comic-name (data)
   "Return a list of target comic's name by html string DATA."
-
-  )
+  ;; TODO: get the name of the target manga.
+  "")
 
 (defun 8comic--comic-image (index)
   "Get the front page image URL by page INDEX."
@@ -131,15 +131,15 @@
   (when (and (not (8comic--page-404-p data))
              (8comic--comic-page-p data))
     (message "data: %s" data)
-    (let ((name (8comic--comic-name data))
-          (img-url (8comic--comic-image index))
-          (episodes (8comic--comic-episodes data)))
-      (message "episodes: %s" episodes)
-      (8comic--set-hash-by-index index
-                                 (8comic--form-page-data name img-url episodes)))))
+    (let* ((name (8comic--comic-name data))
+           (img-url (8comic--comic-image index))
+           (episodes (8comic--comic-episodes data))
+           (page-data (8comic--form-page-data name img-url episodes)))
+      (8comic--set-hash-by-index index page-data))))
 
 (defun 8comic--request-page (index)
   "Requet the comic page by INDEX."
+  (8comic--ensure-hash-table)
   (request
     (format 8comic--url-html-format index)
     :type "GET"
@@ -150,11 +150,17 @@
      (lambda (&key data &allow-other-keys)
        (8comic--get-front-page-data index data)))))
 
+(defun 8comic--ensure-hash-table (&optional reset)
+  "Ensure menu list a hash table object.
+If RESET is non-nil, will force to make a new hash table."
+  (when (or reset (not (hash-table-p 8comic--menu-dic)))
+    (setq 8comic--menu-dic (make-hash-table))))
+
 ;;;###autoload
 (defun 8comic-refresh-menu-list ()
   "Refresh menu list once."
   (interactive)
-  (setq 8comic--menu-dic (make-hash-table))
+  (8comic--ensure-hash-table t)
   (let ((end 1000) (index 2))
     (while (<= index end)
       (8comic--request-page index)
@@ -182,6 +188,7 @@
 (defun 8comic-menu-enter ()
   "Enter the selected item, goto the front page of the selected comic."
   (interactive)
+  ;; TODO: Goto front page.
   )
 
 (defun 8comic--get-menu-entries ()
