@@ -58,11 +58,20 @@
 (defconst 8comic--chapter-id-format (concat 8comic--chapter-id "%s\"")
   "Chapter identifier format.")
 
+(defconst 8comic--request-start 100
+  "Start of the request page index.")
+
+(defconst 8comic--request-end 1000
+  "End of the request page index.")
+
 (defvar 8comic--menu-dic '()
   "Comic menu dictionary.")
 
 (defvar 8comic--missing-episodes 10
   "Allow how many missing gap episodes from one episode to another episode.")
+
+(defvar 8comic--request-counter 0
+  "Request coutner.")
 
 ;;; Util
 
@@ -88,6 +97,14 @@
 
 ;;; Request
 
+(defun 8comic--done-all-requests-p ()
+  "Check if all page requests done."
+  (<= 8comic--request-end 8comic--request-counter))
+
+(defun 8comic--add-request-counter ()
+  "Add up the request counter by 1."
+  (setq 8comic--request-counter (1+ 8comic--request-counter)))
+
 (defun 8comic--form-base-url (post-url)
   "Form full URL by POST-URL."
   (concat 8comic--url-base post-url))
@@ -106,8 +123,11 @@
 
 (defun 8comic--comic-name (data)
   "Return a list of target comic's name by html string DATA."
-  ;; TODO: get the name of the target manga.
-  "")
+  (let ((key-str "letter-spacing:1px\">") (name "") (start nil) (end nil))
+    (setq start (+ (string-match-p key-str data) (length key-str)))
+    (setq end (string-match-p "<" data start))
+    (setq name (substring data start end))
+    name))
 
 (defun 8comic--comic-image (index)
   "Get the front page image URL by page INDEX."
@@ -128,9 +148,7 @@
 
 (defun 8comic--get-front-page-data (index data)
   "Get all needed front page data by mange INDEX and html DATA."
-  (when (and (not (8comic--page-404-p data))
-             (8comic--comic-page-p data))
-    (message "data: %s" data)
+  (when (and (not (8comic--page-404-p data)) (8comic--comic-page-p data))
     (let* ((name (8comic--comic-name data))
            (img-url (8comic--comic-image index))
            (episodes (8comic--comic-episodes data))
@@ -144,11 +162,18 @@
     (format 8comic--url-html-format index)
     :type "GET"
     :parser 'buffer-string
-    :encoding 'utf-8
+    :encoding 'big5
     :success
     (cl-function
      (lambda (&key data &allow-other-keys)
-       (8comic--get-front-page-data index data)))))
+       (8comic--get-front-page-data index data)
+       (8comic--add-request-counter)
+       (8comic--done-refresh-callback)))
+    :error
+    (cl-function
+     (lambda (&rest args &key _error-thrown &allow-other-keys)
+       (8comic--add-request-counter)
+       (8comic--done-refresh-callback)))))
 
 (defun 8comic--ensure-hash-table (&optional reset)
   "Ensure menu list a hash table object.
@@ -161,8 +186,9 @@ If RESET is non-nil, will force to make a new hash table."
   "Refresh menu list once."
   (interactive)
   (8comic--ensure-hash-table t)
-  (let ((end 1000) (index 2))
-    (while (<= index end)
+  (setq 8comic--request-counter 8comic--request-start)
+  (let ((index 8comic--request-start))
+    (while (<= index 8comic--request-end)
       (8comic--request-page index)
       (setq index (1+ index)))))
 
@@ -193,8 +219,10 @@ If RESET is non-nil, will force to make a new hash table."
 
 (defun 8comic--get-menu-entries ()
   "Get all the entries for table."
-  (let ((entries '()) (id-count 0))
-    ;; TODO: ..
+  (let ((entries '()))
+    (dolist (item 8comic--menu-dic)
+
+      )
     entries))
 
 (define-derived-mode 8comic-menu-mode tabulated-list-mode
@@ -208,12 +236,17 @@ If RESET is non-nil, will force to make a new hash table."
   (setq tabulated-list-entries (8comic--get-menu-entries))
   (tabulated-list-print t))
 
+(defun 8comic--done-refresh-callback ()
+  "Callback when done all page requests."
+  (when (8comic--done-all-requests-p)
+    (pop-to-buffer "*8comic-menu*" nil)
+    (8comic-menu-mode)))
+
 ;;;###autoload
 (defun 8comic ()
   "Start 8comic menu."
   (interactive)
-  (pop-to-buffer "*8comic-menu*" nil)
-  (8comic-menu-mode))
+  (8comic-refresh-menu-list))
 
 (provide '8comic)
 ;;; 8comic.el ends here
