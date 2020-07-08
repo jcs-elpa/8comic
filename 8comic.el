@@ -33,7 +33,7 @@
 ;;; Code:
 
 (require 'request)
-(require 'subr-x)
+(require 'cl-lib)
 
 (defgroup 8comic nil
   "Use 8comic to read manga."
@@ -184,7 +184,7 @@
       (setq end search-end)
       (push (substring data start end) lst)
       (setq search-start (string-match-p 8comic--chapter-id-regex data search-end)))
-    (reverse (remove-duplicates lst :test (lambda (x y) (string= x y))))))
+    (reverse (cl-remove-duplicates lst :test (lambda (x y) (string= x y))))))
 
 (defun 8comic--get-front-page-data (index data)
   "Get all needed front page data by mange INDEX and html DATA."
@@ -275,7 +275,7 @@ If RESET is non-nil, will force to make a new hash table."
                    8comic--display-name 8comic--display-episode)))))
 
 (defun 8comic--collect-image-data (data)
-  "Collect all image data."
+  "Collect all image DATA."
   (jcs-log-clean "%s" data)
   (message "%s"
            (format 8comic--url-view-1-format 8comic--display-id 8comic--display-episode)))
@@ -291,7 +291,7 @@ If RESET is non-nil, will force to make a new hash table."
   )
 
 (defun 8comic--to-comic-page (episode)
-  "Lead the buffer to comic display page."
+  "Lead the buffer to comic EPISODE display page."
   (setq 8comic--display-episode episode)
   (8comic--request-comic-page episode))
 
