@@ -7,7 +7,7 @@
 ;; Description: Use 8comic to read manga.
 ;; Keyword: comic manga read reader
 ;; Version: 0.0.1
-;; Package-Requires: ((emacs "24.3") (request "0.3.0"))
+;; Package-Requires: ((emacs "24.4") (request "0.3.0"))
 ;; URL: https://github.com/jcs-elpa/8comic
 
 ;; This file is NOT part of GNU Emacs.
@@ -40,17 +40,16 @@
   :group 'tool
   :link '(url-link :tag "Repository" "https://github.com/jcs-elpa/8comic"))
 
+(defcustom 8comic-max-request-limit 10
+  "Maximum request at a time."
+  :type 'integer
+  :group '8comic)
+
 (defconst 8comic--url-base "https://comicbus.com"
   "URL 8comic base.")
 
 (defconst 8comic--url-html-format (concat 8comic--url-base "/html/%s.html")
   "URL 8comic front page format.")
-
-(defconst 8comic--url-view-1-format (concat 8comic--url-base "/view/%s.html?ch=%s")
-  "URL 8comic view format for first page.")
-
-(defconst 8comic--url-view-a-format (concat 8comic--url-base "/view/%s.html?ch=%s-%s")
-  "URL 8comic view format after first page.")
 
 (defconst 8comic--chapter-id "id=\"c"
   "Chapter identifier.")
@@ -58,11 +57,17 @@
 (defconst 8comic--chapter-id-format (concat 8comic--chapter-id "%s\"")
   "Chapter identifier format.")
 
+(defconst 8comic--description-max-characters 20
+  "Maximum of description characters..")
+
 (defconst 8comic--request-start 100
   "Start of the request page index.")
 
-(defconst 8comic--request-end 1000
+(defconst 8comic--request-end 120
   "End of the request page index.")
+
+(defvar 8comic--show-debug-message t
+  "Show the debug message from this package.")
 
 (defvar 8comic--menu-dic '()
   "Comic menu dictionary.")
@@ -70,10 +75,22 @@
 (defvar 8comic--missing-episodes 10
   "Allow how many missing gap episodes from one episode to another episode.")
 
-(defvar 8comic--request-counter 0
-  "Request coutner.")
+(defvar 8comic--request-index 0
+  "Request page index.")
+
+(defvar 8comic--request-completed 0
+  "Request completed counter.")
 
 ;;; Util
+
+(defun 8comic--debug-message (fmt &rest args)
+  "Debug message like function `message' with same argument FMT and ARGS."
+  (when 8comic--show-debug-message
+    (apply 'message fmt args)))
+
+(defun 8comic--form-front-page-url-by-id (id)
+  "Form front page URL by ID."
+  (format 8comic--url-html-format id))
 
 (defun 8comic--set-hash-by-index (index val)
   "Assign VAL to hash by id INDEX."
@@ -81,6 +98,7 @@
 
 (defun 8comic--get-hash-by-index (index)
   "Return the hash data by key INDEX."
+  (when (stringp index) (setq index (string-to-number index)))
   (gethash index 8comic--menu-dic))
 
 (defun 8comic--insert-image-by-url (url)
@@ -97,25 +115,37 @@
 
 ;;; Request
 
+(defun 8comic--total-requests ()
+  "Totally requests calculation."
+  (- 8comic--request-end 8comic--request-start))
+
 (defun 8comic--done-all-requests-p ()
   "Check if all page requests done."
-  (<= 8comic--request-end 8comic--request-counter))
+  (< (8comic--total-requests) 8comic--request-index))
 
-(defun 8comic--add-request-counter ()
+(defun 8comic--received-all-requests-p ()
+  "Check if all page requests done."
+  (<= (8comic--total-requests) 8comic--request-completed))
+
+(defun 8comic--add-request-index ()
   "Add up the request counter by 1."
-  (setq 8comic--request-counter (1+ 8comic--request-counter)))
+  (setq 8comic--request-index (1+ 8comic--request-index)))
+
+(defun 8comic--add-request-completed ()
+  "Add up the request counter by 1."
+  (setq 8comic--request-completed (1+ 8comic--request-completed)))
 
 (defun 8comic--form-base-url (post-url)
   "Form full URL by POST-URL."
   (concat 8comic--url-base post-url))
 
-(defun 8comic--form-page-data (name img-url episodes)
-  "Form the comic data by front page information, NAME, IMG-URL, EPISODES."
-  (list :name name :image img-url :episodes episodes))
+(defun 8comic--form-page-data (name desc img-url episodes)
+  "Form the comic data by front page information, NAME, DESC, IMG-URL, EPISODES."
+  (list :name name :description desc :image img-url :episodes episodes))
 
 (defun 8comic--page-404-p (data)
   "Check if page 404 by html string DATA."
-  (string-match-p "404" data))
+  (string-match-p "<title>404" data))
 
 (defun 8comic--comic-page-p (data)
   "Check if page a comic page by html string DATA."
@@ -125,9 +155,23 @@
   "Return a list of target comic's name by html string DATA."
   (let ((key-str "letter-spacing:1px\">") (name "") (start nil) (end nil))
     (setq start (+ (string-match-p key-str data) (length key-str)))
-    (setq end (string-match-p "<" data start))
+    (setq end (string-match-p "</" data start))
     (setq name (substring data start end))
     name))
+
+(defun 8comic--comic-description (data)
+  "Get the comice description from DATA."
+  (let ((key-str "line-height:25px\">") (desc "") (start nil) (end nil)
+        (max-chars nil) (limited nil))
+    (setq start (+ (string-match-p key-str data) (length key-str) 2))
+    (setq end (string-match-p "</" data start))
+    (setq desc (substring data start end))
+    (setq desc (string-trim desc))
+    (setq max-chars (length desc))
+    (setq limited (< 8comic--description-max-characters max-chars))
+    (when limited (setq max-chars 8comic--description-max-characters))
+    (setq desc (substring desc 0 max-chars))
+    (if limited (concat desc "..") desc)))
 
 (defun 8comic--comic-image (index)
   "Get the front page image URL by page INDEX."
@@ -150,16 +194,19 @@
   "Get all needed front page data by mange INDEX and html DATA."
   (when (and (not (8comic--page-404-p data)) (8comic--comic-page-p data))
     (let* ((name (8comic--comic-name data))
+           (desc (8comic--comic-description data))
            (img-url (8comic--comic-image index))
            (episodes (8comic--comic-episodes data))
-           (page-data (8comic--form-page-data name img-url episodes)))
+           (page-data (8comic--form-page-data name desc img-url episodes)))
       (8comic--set-hash-by-index index page-data))))
 
-(defun 8comic--request-page (index)
-  "Requet the comic page by INDEX."
+(defun 8comic--request-front-page (index &optional callback)
+  "Requet the comic page by INDEX.
+If CALLBACK is non-nil, we move towards to comic menu page."
+  (8comic--debug-message "[INFO] Requesting 8comic page ID %s" index)
   (8comic--ensure-hash-table)
   (request
-    (format 8comic--url-html-format index)
+    (8comic--form-front-page-url-by-id index)
     :type "GET"
     :parser 'buffer-string
     :encoding 'big5
@@ -167,13 +214,22 @@
     (cl-function
      (lambda (&key data &allow-other-keys)
        (8comic--get-front-page-data index data)
-       (8comic--add-request-counter)
-       (8comic--done-refresh-callback)))
+       (when callback (8comic--after-request))))
     :error
     (cl-function
      (lambda (&rest args &key _error-thrown &allow-other-keys)
-       (8comic--add-request-counter)
-       (8comic--done-refresh-callback)))))
+       (when callback (8comic--after-request))))))
+
+(defun 8comic--after-request ()
+  "Function that call after request."
+  (8comic--add-request-completed) (8comic--add-request-index)
+  (8comic--next-request)
+  (8comic--done-refresh-callback))
+
+(defun 8comic--next-request ()
+  "Send the next page request."
+  (unless (8comic--done-all-requests-p)
+    (8comic--request-front-page (+ 8comic--request-index 8comic--request-start) t)))
 
 (defun 8comic--ensure-hash-table (&optional reset)
   "Ensure menu list a hash table object.
@@ -186,23 +242,95 @@ If RESET is non-nil, will force to make a new hash table."
   "Refresh menu list once."
   (interactive)
   (8comic--ensure-hash-table t)
-  (setq 8comic--request-counter 8comic--request-start)
-  (let ((index 8comic--request-start))
-    (while (<= index 8comic--request-end)
-      (8comic--request-page index)
+  (setq 8comic--request-index (1- 8comic-max-request-limit))
+  (setq 8comic--request-completed 0)
+  (let ((index 0) (request-index -1))
+    (while (< index 8comic-max-request-limit)
+      (setq request-index (+ 8comic--request-start index))
+      (8comic--request-front-page request-index t)
       (setq index (1+ index)))))
+
+;;; Comic Page
+
+(defconst 8comic--url-view-1-format (concat 8comic--url-base "/view/%s.html?ch=%s")
+  "URL 8comic view format for first page.")
+
+(defconst 8comic--url-view-a-format (concat 8comic--url-base "/view/%s.html?ch=%s-%s")
+  "URL 8comic view format after first page.")
 
 ;;; Front Page
 
+(defconst 8comic--front-page-table-format
+  (vector (list "Episode" 6 t))
+  "Format to assign to `tabulated-list-format' variable for front page.")
 
+(defvar 8comic-front-page-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "RET") '8comic-front-page-enter)
+    (define-key map (kbd "<mouse-1>") '8comic-front-page-enter)
+    map)
+  "Keymap for `8comic-front-page-mode'.")
+
+(defvar 8comic--front-page-display-id -1
+  "Current displayed comic ID.")
+
+(defvar 8comic--front-page-display-data nil
+  "Current displayed comic data, data is a plist.")
+
+(defun 8comic-front-page-enter ()
+  "Return key in front page."
+  (interactive))
+
+(defun 8comic--make-entry-front-page (id ep)
+  "Make new entry by data, ID, episode (EP)."
+  (let ((new-entry '()) (new-entry-value '()))
+    (progn
+      (when (numberp id) (setq id (number-to-string id)))
+      (when (numberp ep) (setq ep (number-to-string ep))))
+    (push ep new-entry-value)  ; Episode Number
+    (push (vconcat new-entry-value) new-entry)  ; Turn into vector.
+    (push id new-entry)  ; ID, index is ID.
+    new-entry))
+
+(defun 8comic--get-front-page-entries ()
+  "Get the front page data."
+  (let ((entries '()) (new-entry nil)
+        (episodes (plist-get 8comic--front-page-display-data :episodes)))
+    (dolist (ep episodes)
+      (setq new-entry
+            (8comic--make-entry-front-page
+             ep
+             (propertize (format "%s" ep) 'face 'font-lock-builtin-face)))
+      (push new-entry entries))
+    (reverse entries)))
+
+(define-derived-mode 8comic-front-page-mode tabulated-list-mode
+  "8comic-front-page-mode"
+  "Major mode for 8comic front page mode."
+  :group '8comic
+  (setq tabulated-list-format 8comic--front-page-table-format)
+  (setq tabulated-list-padding 2)
+  (setq tabulated-list--header-string
+        (format "URL: %s" (8comic--form-front-page-url-by-id 8comic--front-page-display-id)))
+  (tabulated-list-init-header)
+  (setq tabulated-list-entries (8comic--get-front-page-entries))
+  (tabulated-list-print t)
+  (tabulated-list-print-fake-header))
+
+(defun 8comic--to-front-page (id)
+  "Move from menu page to front page by compic ID."
+  (setq 8comic--front-page-display-id id)
+  (setq 8comic--front-page-display-data (8comic--get-hash-by-index id))
+  (switch-to-buffer (format "*8comic: %s*" (plist-get 8comic--front-page-display-data :name)) nil)
+  (8comic-front-page-mode))
 
 ;;; Menu
 
 (defconst 8comic--menu-table-format
-  (vector (list "ID" 8 t)
-          (list "Name" 10 t)
+  (vector (list "ID" 6 t)
+          (list "Name" 15 t)
           (list "Description" 20 t))
-  "Format to assign to `tabulated-list-format' variable.")
+  "Format to assign to `tabulated-list-format' variable for menu page.")
 
 (defvar 8comic-menu-mode-map
   (let ((map (make-sparse-keymap)))
@@ -214,15 +342,33 @@ If RESET is non-nil, will force to make a new hash table."
 (defun 8comic-menu-enter ()
   "Enter the selected item, goto the front page of the selected comic."
   (interactive)
-  ;; TODO: Goto front page.
-  )
+  (let ((id (tabulated-list-get-id))) (8comic--to-front-page id)))
+
+(defun 8comic--make-entry-menu (id name desc)
+  "Make new entry by data, ID, NAME, DESC."
+  (let ((new-entry '()) (new-entry-value '()))
+    (setq id (number-to-string id))
+    (push desc new-entry-value)  ; Description
+    (push name new-entry-value)  ; Name
+    (push id new-entry-value)  ; ID, index is ID.
+    (push (vconcat new-entry-value) new-entry)  ; Turn into vector.
+    (push id new-entry)  ; ID, index is ID.
+    new-entry))
 
 (defun 8comic--get-menu-entries ()
   "Get all the entries for table."
-  (let ((entries '()))
-    (dolist (item 8comic--menu-dic)
-      ;; TODO: ..
-      )
+  (let ((entries '()) (index 8comic--request-start)
+        (data nil) (new-entry nil))
+    (while (< index 8comic--request-end)
+      (setq data (8comic--get-hash-by-index index))
+      (when data
+        (setq new-entry
+              (8comic--make-entry-menu index
+                                  (propertize (plist-get data :name)
+                                              'face 'font-lock-builtin-face)
+                                  (plist-get data :description)))
+        (push new-entry entries))
+      (setq index (1+ index)))
     entries))
 
 (define-derived-mode 8comic-menu-mode tabulated-list-mode
@@ -230,7 +376,7 @@ If RESET is non-nil, will force to make a new hash table."
   "Major mode for 8comic menu mode."
   :group '8comic
   (setq tabulated-list-format 8comic--menu-table-format)
-  (setq tabulated-list-padding 1)
+  (setq tabulated-list-padding 2)
   (setq tabulated-list-sort-key (cons "Name" nil))
   (tabulated-list-init-header)
   (setq tabulated-list-entries (8comic--get-menu-entries))
@@ -238,7 +384,7 @@ If RESET is non-nil, will force to make a new hash table."
 
 (defun 8comic--done-refresh-callback ()
   "Callback when done all page requests."
-  (when (8comic--done-all-requests-p)
+  (when (8comic--received-all-requests-p)
     (pop-to-buffer "*8comic-menu*" nil)
     (8comic-menu-mode)))
 
