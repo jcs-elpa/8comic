@@ -32,8 +32,8 @@
 
 ;;; Code:
 
-(require 'request)
 (require 'cl-lib)
+(require 'request)
 
 (defgroup 8comic nil
   "Use 8comic to read manga."
