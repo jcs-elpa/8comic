@@ -51,11 +51,8 @@
 (defconst 8comic--url-html-format (concat 8comic--url-base "/html/%s.html")
   "URL 8comic front page format.")
 
-(defconst 8comic--chapter-id "id=\"c"
+(defconst 8comic--chapter-id-regex "[0-9]+[卷話][ <]"
   "Chapter identifier.")
-
-(defconst 8comic--chapter-id-format (concat 8comic--chapter-id "%s\"")
-  "Chapter identifier format.")
 
 (defconst 8comic--description-max-characters 20
   "Maximum of description characters..")
@@ -71,9 +68,6 @@
 
 (defvar 8comic--menu-dic '()
   "Comic menu dictionary.")
-
-(defvar 8comic--missing-episodes 10
-  "Allow how many missing gap episodes from one episode to another episode.")
 
 (defvar 8comic--request-index 0
   "Request page index.")
@@ -149,7 +143,7 @@
 
 (defun 8comic--comic-page-p (data)
   "Check if page a comic page by html string DATA."
-  (string-match-p 8comic--chapter-id data))
+  (string-match-p 8comic--chapter-id-regex data))
 
 (defun 8comic--comic-name (data)
   "Return a list of target comic's name by html string DATA."
@@ -179,16 +173,17 @@
 
 (defun 8comic--comic-episodes (data)
   "Return a list of target comic's episodes by html string DATA."
-  (let ((lst '()) (ep 0) (id-str "") (found nil)
-        (max-ep 8comic--missing-episodes))
-    (while (< ep max-ep)
-      (setq id-str (format 8comic--chapter-id-format ep))
-      (setq found (string-match-p id-str data))
-      (when found
-        (setq max-ep (+ ep 8comic--missing-episodes))  ; Raise max episodes search limit.
-        (push ep lst))
-      (setq ep (1+ ep)))
-    (reverse lst)))
+  (let ((lst '())
+        (search-start (string-match-p 8comic--chapter-id-regex data 0))
+        (search-end -1)
+        (start nil) (end nil))
+    (while search-start
+      (setq search-end (string-match-p "[</]" data search-start))
+      (setq start search-start)
+      (setq end search-end)
+      (push (substring data start end) lst)
+      (setq search-start (string-match-p 8comic--chapter-id-regex data search-end)))
+    (reverse (remove-duplicates lst :test (lambda (x y) (string= x y))))))
 
 (defun 8comic--get-front-page-data (index data)
   "Get all needed front page data by mange INDEX and html DATA."
@@ -258,6 +253,45 @@ If RESET is non-nil, will force to make a new hash table."
 (defconst 8comic--url-view-a-format (concat 8comic--url-base "/view/%s.html?ch=%s-%s")
   "URL 8comic view format after first page.")
 
+(defvar 8comic--display-episode -1
+  "Episode currently displaying.")
+
+(defun 8comic--request-comic-page (episode)
+  "Request the current EPISODE page."
+  (request
+    (format 8comic--url-view-1-format 8comic--display-id 8comic--display-episode)
+    :type "GET"
+    :parser 'buffer-string
+    :encoding 'utf-8
+    :success
+    (cl-function
+     (lambda (&key data &allow-other-keys)
+       (8comic--collect-image-data data)))
+    :error
+    (cl-function
+     (lambda (&rest args &key _error-thrown &allow-other-keys)
+       (user-error "[ERROR] Request error getting %s, episode %s"
+                   8comic--display-name 8comic--display-episode)))))
+
+(defun 8comic--collect-image-data (data)
+  "Collect all image data."
+  (message "%s" data))
+
+(defun 8comic--display-comic (data)
+  "Display comic by first page DATA."
+  (switch-to-buffer (format "*8comic: %s <%s>*"
+                            8comic--display-name 8comic--display-episode))
+  (insert (format 8comic--url-view-1-format 8comic--display-id 8comic--display-episode))
+  (insert "\n")
+
+  ;; TODO: ..
+  )
+
+(defun 8comic--to-comic-page (episode)
+  "Lead the buffer to comic display page."
+  (setq 8comic--display-episode episode)
+  (8comic--request-comic-page episode))
+
 ;;; Front Page
 
 (defconst 8comic--front-page-table-format
@@ -271,15 +305,23 @@ If RESET is non-nil, will force to make a new hash table."
     map)
   "Keymap for `8comic-front-page-mode'.")
 
-(defvar 8comic--front-page-display-id -1
+(defvar 8comic--display-id -1
   "Current displayed comic ID.")
 
-(defvar 8comic--front-page-display-data nil
+(defvar 8comic--display-data nil
   "Current displayed comic data, data is a plist.")
+
+(defvar 8comic--display-name ""
+  "Current displayed comic name.")
 
 (defun 8comic-front-page-enter ()
   "Return key in front page."
-  (interactive))
+  (interactive)
+  (let* ((episode (elt (tabulated-list-get-entry) 0))
+         (end (string-match-p "[^0-9]" episode)))
+    (setq episode (substring episode 0 end))
+    (setq episode (string-to-number episode))
+    (8comic--to-comic-page episode)))
 
 (defun 8comic--make-entry-front-page (id ep)
   "Make new entry by data, ID, episode (EP)."
@@ -295,7 +337,7 @@ If RESET is non-nil, will force to make a new hash table."
 (defun 8comic--get-front-page-entries ()
   "Get the front page data."
   (let ((entries '()) (new-entry nil)
-        (episodes (plist-get 8comic--front-page-display-data :episodes)))
+        (episodes (plist-get 8comic--display-data :episodes)))
     (dolist (ep episodes)
       (setq new-entry
             (8comic--make-entry-front-page
@@ -310,8 +352,9 @@ If RESET is non-nil, will force to make a new hash table."
   :group '8comic
   (setq tabulated-list-format 8comic--front-page-table-format)
   (setq tabulated-list-padding 2)
+  (setq tabulated-list-sort-key (cons "Episode" t))
   (setq tabulated-list--header-string
-        (format "URL: %s" (8comic--form-front-page-url-by-id 8comic--front-page-display-id)))
+        (format "URL: %s" (8comic--form-front-page-url-by-id 8comic--display-id)))
   (tabulated-list-init-header)
   (setq tabulated-list-entries (8comic--get-front-page-entries))
   (tabulated-list-print t)
@@ -319,9 +362,10 @@ If RESET is non-nil, will force to make a new hash table."
 
 (defun 8comic--to-front-page (id)
   "Move from menu page to front page by compic ID."
-  (setq 8comic--front-page-display-id id)
-  (setq 8comic--front-page-display-data (8comic--get-hash-by-index id))
-  (switch-to-buffer (format "*8comic: %s*" (plist-get 8comic--front-page-display-data :name)) nil)
+  (setq 8comic--display-id id)
+  (setq 8comic--display-data (8comic--get-hash-by-index id))
+  (setq 8comic--display-name (plist-get 8comic--display-data :name))
+  (switch-to-buffer (format "*8comic: %s*" 8comic--display-name) nil)
   (8comic-front-page-mode))
 
 ;;; Menu
