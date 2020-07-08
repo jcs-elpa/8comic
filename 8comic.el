@@ -33,6 +33,7 @@
 ;;; Code:
 
 (require 'request)
+(require 'subr-x)
 
 (defgroup 8comic nil
   "Use 8comic to read manga."
@@ -275,7 +276,9 @@ If RESET is non-nil, will force to make a new hash table."
 
 (defun 8comic--collect-image-data (data)
   "Collect all image data."
-  (message "%s" data))
+  (jcs-log-clean "%s" data)
+  (message "%s"
+           (format 8comic--url-view-1-format 8comic--display-id 8comic--display-episode)))
 
 (defun 8comic--display-comic (data)
   "Display comic by first page DATA."
