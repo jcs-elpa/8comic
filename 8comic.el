@@ -76,7 +76,9 @@
 (defvar 8comic--request-completed 0
   "Request completed counter.")
 
-;;; Util
+;;
+;; (@* "Util" )
+;;
 
 (defun 8comic--debug-message (fmt &rest args)
   "Debug message like function `message' with same argument FMT and ARGS."
@@ -108,7 +110,9 @@
           (insert-image (create-image data nil t)))
       (kill-buffer buffer))))
 
-;;; Request
+;;
+;; (@* "Request" )
+;;
 
 (defun 8comic--total-requests ()
   "Totally requests calculation."
@@ -244,7 +248,9 @@ If RESET is non-nil, will force to make a new hash table."
       (8comic--request-front-page request-index t)
       (setq index (1+ index)))))
 
-;;; Comic Page
+;;
+;; (@* "Comic Page" )
+;;
 
 (defconst 8comic--url-view-1-format (concat 8comic--url-base "/view/%s.html?ch=%s")
   "URL 8comic view format for first page.")
@@ -293,7 +299,9 @@ If RESET is non-nil, will force to make a new hash table."
   (setq 8comic--display-episode episode)
   (8comic--request-comic-page episode))
 
-;;; Front Page
+;;
+;; (@* "Front Page" )
+;;
 
 (defconst 8comic--front-page-table-format
   (vector (list "Episode" 6 t))
@@ -369,7 +377,9 @@ If RESET is non-nil, will force to make a new hash table."
   (switch-to-buffer (format "*8comic: %s*" 8comic--display-name) nil)
   (8comic-front-page-mode))
 
-;;; Menu
+;;
+;; (@* "Menu" )
+;;
 
 (defconst 8comic--menu-table-format
   (vector (list "ID" 6 t)
