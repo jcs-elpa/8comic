@@ -41,6 +41,11 @@
   :group 'tool
   :link '(url-link :tag "Repository" "https://github.com/jcs-elpa/8comic"))
 
+(defcustom 8comic-watch-list '()
+  "List of comic you would like to keep track of when first load."
+  :type 'list
+  :group '8comic)
+
 (defcustom 8comic-max-request-limit 10
   "Maximum request at a time."
   :type 'integer
@@ -57,12 +62,6 @@
 
 (defconst 8comic--description-max-characters 20
   "Maximum of description characters..")
-
-(defconst 8comic--request-start 100
-  "Start of the request page index.")
-
-(defconst 8comic--request-end 120
-  "End of the request page index.")
 
 (defvar 8comic--show-debug-message t
   "Show the debug message from this package.")
@@ -116,15 +115,15 @@
 
 (defun 8comic--total-requests ()
   "Totally requests calculation."
-  (- 8comic--request-end 8comic--request-start))
+  (length 8comic-watch-list))
 
 (defun 8comic--done-all-requests-p ()
   "Check if all page requests done."
-  (< (8comic--total-requests) 8comic--request-index))
+  (<= (8comic--total-requests) 8comic--request-index))
 
 (defun 8comic--received-all-requests-p ()
   "Check if all page requests done."
-  (<= (8comic--total-requests) 8comic--request-completed))
+  (<= (8comic--total-requests) (1+ 8comic--request-completed)))
 
 (defun 8comic--add-request-index ()
   "Add up the request counter by 1."
@@ -227,7 +226,7 @@ If CALLBACK is non-nil, we move towards to comic menu page."
 (defun 8comic--next-request ()
   "Send the next page request."
   (unless (8comic--done-all-requests-p)
-    (8comic--request-front-page (+ 8comic--request-index 8comic--request-start) t)))
+    (8comic--request-front-page (nth 8comic--request-index 8comic-watch-list) t)))
 
 (defun 8comic--ensure-hash-table (&optional reset)
   "Ensure menu list a hash table object.
@@ -240,13 +239,13 @@ If RESET is non-nil, will force to make a new hash table."
   "Refresh menu list once."
   (interactive)
   (8comic--ensure-hash-table t)
-  (setq 8comic--request-index (1- 8comic-max-request-limit))
-  (setq 8comic--request-completed 0)
-  (let ((index 0) (request-index -1))
-    (while (< index 8comic-max-request-limit)
-      (setq request-index (+ 8comic--request-start index))
-      (8comic--request-front-page request-index t)
-      (setq index (1+ index)))))
+  (setq 8comic--request-index 0
+        8comic--request-completed 0)
+  (let (comic-id break)
+    (while (and (not break) (< 8comic--request-index 8comic-max-request-limit))
+      (setq comic-id (nth 8comic--request-index 8comic-watch-list))
+      (if comic-id (8comic--request-front-page comic-id t) (setq break t))
+      (8comic--add-request-index))))
 
 ;;
 ;; (@* "Comic Page" )
@@ -397,7 +396,7 @@ If RESET is non-nil, will force to make a new hash table."
 (defun 8comic-menu-enter ()
   "Enter the selected item, goto the front page of the selected comic."
   (interactive)
-  (let ((id (tabulated-list-get-id))) (8comic--to-front-page id)))
+  (let ((id (tabulated-list-get-id))) (when id (8comic--to-front-page id))))
 
 (defun 8comic--make-entry-menu (id name desc)
   "Make new entry by data, ID, NAME, DESC."
@@ -412,8 +411,8 @@ If RESET is non-nil, will force to make a new hash table."
 
 (defun 8comic--get-menu-entries ()
   "Get all the entries for table."
-  (let ((index 8comic--request-start) entries data new-entry)
-    (while (< index 8comic--request-end)
+  (let (entries data new-entry)
+    (dolist (index 8comic-watch-list)
       (setq data (8comic--get-hash-by-index index))
       (when data
         (setq new-entry
@@ -421,17 +420,16 @@ If RESET is non-nil, will force to make a new hash table."
                                        (propertize (plist-get data :name)
                                                    'face 'font-lock-builtin-face)
                                        (plist-get data :description)))
-        (push new-entry entries))
-      (setq index (1+ index)))
+        (push new-entry entries)))
     entries))
 
 (define-derived-mode 8comic-menu-mode tabulated-list-mode
   "8comic-menu-mode"
   "Major mode for 8comic menu mode."
   :group '8comic
-  (setq tabulated-list-format 8comic--menu-table-format)
-  (setq tabulated-list-padding 2)
-  (setq tabulated-list-sort-key (cons "Name" nil))
+  (setq tabulated-list-format 8comic--menu-table-format
+        tabulated-list-padding 2
+        tabulated-list-sort-key (cons "Name" nil))
   (tabulated-list-init-header)
   (setq tabulated-list-entries (8comic--get-menu-entries))
   (tabulated-list-print t))
