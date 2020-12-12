@@ -148,22 +148,21 @@
 
 (defun 8comic--comic-name (data)
   "Return a list of target comic's name by html string DATA."
-  (let ((key-str "letter-spacing:1px\">") (name "") (start nil) (end nil))
-    (setq start (+ (string-match-p key-str data) (length key-str)))
-    (setq end (string-match-p "</" data start))
-    (setq name (substring data start end))
+  (let ((key-str "letter-spacing:1px\">") (name "") start end)
+    (setq start (+ (string-match-p key-str data) (length key-str))
+          end (string-match-p "</" data start)
+          name (substring data start end))
     name))
 
 (defun 8comic--comic-description (data)
   "Get the comice description from DATA."
-  (let ((key-str "line-height:25px\">") (desc "") (start nil) (end nil)
-        (max-chars nil) (limited nil))
-    (setq start (+ (string-match-p key-str data) (length key-str) 2))
-    (setq end (string-match-p "</" data start))
-    (setq desc (substring data start end))
-    (setq desc (string-trim desc))
-    (setq max-chars (length desc))
-    (setq limited (< 8comic--description-max-characters max-chars))
+  (let ((key-str "line-height:25px\">") (desc "") start end max-chars limited)
+    (setq start (+ (string-match-p key-str data) (length key-str) 2)
+          end (string-match-p "</" data start)
+          desc (substring data start end)
+          desc (string-trim desc)
+          max-chars (length desc)
+          limited (< 8comic--description-max-characters max-chars))
     (when limited (setq max-chars 8comic--description-max-characters))
     (setq desc (substring desc 0 max-chars))
     (if limited (concat desc "..") desc)))
@@ -174,14 +173,13 @@
 
 (defun 8comic--comic-episodes (data)
   "Return a list of target comic's episodes by html string DATA."
-  (let ((lst '())
-        (search-start (string-match-p 8comic--chapter-id-regex data 0))
+  (let ((search-start (string-match-p 8comic--chapter-id-regex data 0))
         (search-end -1)
-        (start nil) (end nil))
+        start end lst)
     (while search-start
-      (setq search-end (string-match-p "[</]" data search-start))
-      (setq start search-start)
-      (setq end search-end)
+      (setq search-end (string-match-p "[</]" data search-start)
+            start search-start
+            end search-end)
       (push (substring data start end) lst)
       (setq search-start (string-match-p 8comic--chapter-id-regex data search-end)))
     (reverse (cl-remove-duplicates lst :test (lambda (x y) (string= x y))))))
@@ -322,13 +320,13 @@ If RESET is non-nil, will force to make a new hash table."
   (interactive)
   (let* ((episode (elt (tabulated-list-get-entry) 0))
          (end (string-match-p "[^0-9]" episode)))
-    (setq episode (substring episode 0 end))
-    (setq episode (string-to-number episode))
+    (setq episode (substring episode 0 end)
+          episode (string-to-number episode))
     (8comic--to-comic-page episode)))
 
 (defun 8comic--make-entry-front-page (id ep)
   "Make new entry by data, ID, episode (EP)."
-  (let ((new-entry '()) (new-entry-value '()))
+  (let (new-entry new-entry-value)
     (progn
       (when (numberp id) (setq id (number-to-string id)))
       (when (numberp ep) (setq ep (number-to-string ep))))
@@ -339,8 +337,8 @@ If RESET is non-nil, will force to make a new hash table."
 
 (defun 8comic--get-front-page-entries ()
   "Get the front page data."
-  (let ((entries '()) (new-entry nil)
-        (episodes (plist-get 8comic--display-data :episodes)))
+  (let (entries new-entry
+                (episodes (plist-get 8comic--display-data :episodes)))
     (dolist (ep episodes)
       (setq new-entry
             (8comic--make-entry-front-page
@@ -353,10 +351,10 @@ If RESET is non-nil, will force to make a new hash table."
   "8comic-front-page-mode"
   "Major mode for 8comic front page mode."
   :group '8comic
-  (setq tabulated-list-format 8comic--front-page-table-format)
-  (setq tabulated-list-padding 2)
-  (setq tabulated-list-sort-key (cons "Episode" t))
-  (setq tabulated-list--header-string
+  (setq tabulated-list-format 8comic--front-page-table-format
+        tabulated-list-padding 2
+        tabulated-list-sort-key (cons "Episode" t)
+        tabulated-list--header-string
         (format "URL: %s" (8comic--form-front-page-url-by-id 8comic--display-id)))
   (tabulated-list-init-header)
   (setq tabulated-list-entries (8comic--get-front-page-entries))
@@ -365,9 +363,9 @@ If RESET is non-nil, will force to make a new hash table."
 
 (defun 8comic--to-front-page (id)
   "Move from menu page to front page by compic ID."
-  (setq 8comic--display-id id)
-  (setq 8comic--display-data (8comic--get-hash-by-index id))
-  (setq 8comic--display-name (plist-get 8comic--display-data :name))
+  (setq 8comic--display-id id
+        8comic--display-data (8comic--get-hash-by-index id)
+        8comic--display-name (plist-get 8comic--display-data :name))
   (switch-to-buffer (format "*8comic: %s*" 8comic--display-name) nil)
   (8comic-front-page-mode))
 
@@ -393,7 +391,7 @@ If RESET is non-nil, will force to make a new hash table."
 
 (defun 8comic--make-entry-menu (id name desc)
   "Make new entry by data, ID, NAME, DESC."
-  (let ((new-entry '()) (new-entry-value '()))
+  (let (new-entry new-entry-value)
     (setq id (number-to-string id))
     (push desc new-entry-value)  ; Description
     (push name new-entry-value)  ; Name
@@ -404,16 +402,15 @@ If RESET is non-nil, will force to make a new hash table."
 
 (defun 8comic--get-menu-entries ()
   "Get all the entries for table."
-  (let ((entries '()) (index 8comic--request-start)
-        (data nil) (new-entry nil))
+  (let ((index 8comic--request-start) entries data new-entry)
     (while (< index 8comic--request-end)
       (setq data (8comic--get-hash-by-index index))
       (when data
         (setq new-entry
               (8comic--make-entry-menu index
-                                  (propertize (plist-get data :name)
-                                              'face 'font-lock-builtin-face)
-                                  (plist-get data :description)))
+                                       (propertize (plist-get data :name)
+                                                   'face 'font-lock-builtin-face)
+                                       (plist-get data :description)))
         (push new-entry entries))
       (setq index (1+ index)))
     entries))
