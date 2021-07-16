@@ -1,5 +1,5 @@
-[![Build Status](https://travis-ci.com/jcs-elpa/8comic.svg?branch=master)](https://travis-ci.com/jcs-elpa/8comic)
 [![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![CI](https://github.com/jcs-elpa/8comic/actions/workflows/test.yml/badge.svg)](https://github.com/jcs-elpa/8comic/actions/workflows/test.yml)
 
 # 8comic
 > Use 8comic to read manga.
