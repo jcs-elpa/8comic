@@ -4,11 +4,10 @@
 ;; Created date 2020-07-05 22:43:56
 
 ;; Author: Shen, Jen-Chieh <jcs090218@gmail.com>
-;; Description: Use 8comic to read manga.
-;; Keyword: comic manga read reader
+;; URL: https://github.com/jcs-elpa/8comic
 ;; Version: 0.0.1
 ;; Package-Requires: ((emacs "24.4") (request "0.3.0"))
-;; URL: https://github.com/jcs-elpa/8comic
+;; Keywords: comic manga read reader
 
 ;; This file is NOT part of GNU Emacs.
 
