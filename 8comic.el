@@ -7,7 +7,7 @@
 ;; URL: https://github.com/jcs-elpa/8comic
 ;; Version: 0.0.1
 ;; Package-Requires: ((emacs "24.4") (request "0.3.0"))
-;; Keywords: comic manga read reader
+;; Keywords: multimedia comic manga read reader
 
 ;; This file is NOT part of GNU Emacs.
 
