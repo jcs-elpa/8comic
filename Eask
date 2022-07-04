@@ -1,7 +1,7 @@
 (package "8comic" "0.0.1" "Use 8comic to read manga")
 
 (website-url "https://github.com/jcs-elpa/8comic")
-(keywords "comic" "manga" "read" "reader")
+(keywords "multimedia" "comic" "manga" "read" "reader")
 
 (package-file "8comic.el")
 
