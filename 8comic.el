@@ -1,6 +1,6 @@
 ;;; 8comic.el --- Use 8comic to read manga  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2020  Shen, Jen-Chieh
+;; Copyright (C) 2020-2024  Shen, Jen-Chieh
 ;; Created date 2020-07-05 22:43:56
 
 ;; Author: Shen, Jen-Chieh <jcs090218@gmail.com>
