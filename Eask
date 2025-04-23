@@ -1,3 +1,5 @@
+;; -*- mode: eask; lexical-binding: t -*-
+
 (package "8comic" "0.0.1" "Use 8comic to read manga")
 
 (website-url "https://github.com/jcs-elpa/8comic")
